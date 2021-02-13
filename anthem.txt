@@ -1,0 +1,33 @@
+First, as always, run an nmap scan on the machine
+	nmap xxx.xxx.xxx.xxx
+	Well that didnt work, lets do nmap -Pn xxx.xxx.xxx.xxx
+	hmm...we got some information but not all, what is the webserver port
+	nmap -p0-99 -Pn -vv xxx.xxx.xxx.xxx
+	We still dont know a possible password though, lets trying running an NMAP script
+        nmap -A -p0-99 -Pn -vv -sC -sV xxx.xxx.xxx.xxx
+		Now we found a robots.txt file
+		http://xxx.xxx.xxx.xxx/robots.txt
+		The Umbarco looks like a password, lets try that
+	Now we need to find the admin
+		Lets look at the blog posts and see if that tells us anything
+		There is a poem, lets google that poem
+		There is the admin for the page
+	Now we need to find the flags
+		They are hidden in the pages, the hint tells us to inspect the pages
+			Flag one, on the we are hiring page in the meta content
+			Flag 2, main page under nav, li, div, form, input
+			Flag 3, the picture of Jane Doe
+			Flag 4, IT department page
+	Now we need to install remmina, which is used for RDP within Linux system
+		sudo apt-get install remmina
+		Now a username and password, we already figured this out in task one, remember
+		Now lets get the admin username and password
+			Go to this pc, then go to view and view hidden files
+			From there lets see if anything is hidden in the C:/
+			we can see that backup is, however we do not have access to the txt file
+			that is ok, change the permissions to gain access
+			there is our next password
+		Lets not reinvent the wheel here, just log out and log back in
+			administrator
+			ChangeMeBaby1MoreTime
+WE ARE DONE, YEAH!!!

